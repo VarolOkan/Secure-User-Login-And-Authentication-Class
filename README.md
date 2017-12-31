@@ -8,15 +8,24 @@
  
  Requires PHP5 >= 5.1 
  
- # license     http://creativecommons.org/licenses/MIT/ MIT
- # category    authentication
- # package     Secure User Sessions
- # author      David Miles <david@amereservant.com>
- # orig-link   https://github.com/amereservant/Secure-User-Login-And-Authentication-Class
- # orig-link   https://github.com/VarolOkan/Secure-User-Login-And-Authentication-Class
- # version     1.1
- # since       1.0 (January 14, 2011)
- # updated     Dec 31 2017 Varol Okan
+ #### license     
+		http://creativecommons.org/licenses/MIT/ MIT
+ #### category    
+		authentication
+ #### package     
+		Secure User Sessions
+ #### author      
+		David Miles <david@amereservant.com>
+ #### orig-link   
+		https://github.com/amereservant/Secure-User-Login-And-Authentication-Class
+ #### orig-link   
+		https://github.com/VarolOkan/Secure-User-Login-And-Authentication-Class
+ #### version     
+		1.1
+ #### since      
+		1.0 (January 14, 2011)
+ #### updated     
+		Dec 31 2017 Varol Okan
 
 Improved slightly to work with sample LoginPage from
 
