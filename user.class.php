@@ -1,22 +1,21 @@
 <?php
-if(!defined('DEBUG')) define('DEBUG', true);
-
+if(!defined('DEBUG')) define('DEBUG', false);
 // Database Settings (These SHOULD be set somewhere else!)
-    
-    // MySQL
+
+define("COOKIE_EXPIRE", 60*60*24*100);  //100 days by default
+define("COOKIE_PATH", "/");  //Avaible in whole domain
+ 
+// MySQL
 if(!defined('DB_HOST')) define('DB_HOST', ''); // Database Host Name
 if(!defined('DB_USER')) define('DB_USER', ''); // Database Username
 if(!defined('DB_PASS')) define('DB_PASS', ''); // Database Password
 if(!defined('DB_NAME')) define('DB_NAME', ''); // Database Name
-
-    // SQLite
+// SQLite
 if(!defined('SQLITE_FILE')) define('SQLITE_FILE', './test.sdb'); // SQLite Filename and path
-
 // Session Security Constants
 define('_SESSION_SALT', $_SERVER['HTTP_HOST']);
 define('_SESSION_NAME', preg_replace('#[^a-z0-9]#i', '', $_SERVER['HTTP_HOST']));
 define('_SESSION_DIR', str_replace('.', '_', $_SERVER['HTTP_HOST']) . '_sessiondata');
-
 /**
  * Secure User Login And Authentication Class
  *
@@ -36,7 +35,6 @@ define('_SESSION_DIR', str_replace('.', '_', $_SERVER['HTTP_HOST']) . '_sessiond
  * @version     1.0
  * @since       1.0 (January 14, 2011)
  */
-
 /**
  * Authentication Class
  */
@@ -50,7 +48,6 @@ class userAuth extends PDO
     * @since    1.0
     */
     private $_secure_word = 'SECUREDSALT_';
-
    /**
     * Use User Agent
     *
@@ -84,7 +81,7 @@ class userAuth extends PDO
     * @access   private
     * @since    1.0
     */
-    private $_is_sqlite;
+    private $_is_sqlite = true;
     
    /**
     * Cookie Name
@@ -149,7 +146,7 @@ class userAuth extends PDO
         }
         $this->_is_sqlite = $this->getAttribute(PDO::ATTR_DRIVER_NAME) == 'sqlite';
     }
-    
+   
    /**
     * Encrypt Password
     *
@@ -199,11 +196,9 @@ class userAuth extends PDO
         $part[3] = "{pass}";
         $psort   = array_rand($part,3);
         $pattern = $part[$psort[0]].".".$part[$psort[1]].".".$part[$psort[2]];
-
         // Now for pass
         $grep = array( "/{salt1}/", "/{salt2}/", "/{pass}/" ); // Identify pattern
         $repl = array( $salt1, $salt2, $password ); // Make pattern real
-
         // Now replace the pattern with actual values
         $sendpass = preg_replace( $grep, $repl, $pattern );
         
@@ -233,7 +228,6 @@ class userAuth extends PDO
         $grep = array( "/{salt1}/", "/{salt2}/", "/{pass}/" );        // Identify pattern
         $repl = array( $encrypt['salt1'], $encrypt['salt2'], $pass ); // Make pattern real
         $pwd  = preg_replace( $grep, $repl, $encrypt['pattern'] );    // Generate password how it should be.
-
         // Now let's make sure the user is properly identifying!
         if( sha1($pwd) != $encrypt['password'] )
         {
@@ -255,7 +249,7 @@ class userAuth extends PDO
     * @access   public
     * @since    1.0
     */
-    public function user_login( $username, $password )
+    public function user_login( $username, $password, $remember )
     {
         // Check if user is already logged in and return if so
         if($this->validate_uniquekey()) 
@@ -283,7 +277,14 @@ class userAuth extends PDO
             $this->_destroy();
             return false;
         }
-        return $this->set_session( $result ); // User is logged in, add to $_SESSION data
+
+        $ret = $this->set_session( $result ); // User is logged in, add to $_SESSION data
+        if ( $remember )  {
+          setcookie ( "cookname", $username, time()+COOKIE_EXPIRE, COOKIE_PATH );
+          setcookie ( "_UniqueKey", $_SESSION['_UniqueKey'], time()+COOKIE_EXPIRE, COOKIE_PATH );
+        }
+
+        return $ret;
     }
     
    /**
@@ -298,9 +299,29 @@ class userAuth extends PDO
     */
     public function user_logout()
     {
-        $this->_destroy();
+      if ( isset ( $_COOKIE['cookname']) && isset($_COOKIE['cookid']) )  {
+         setcookie("cookname",   "", time()-COOKIE_EXPIRE, COOKIE_PATH);
+         setcookie("_UniqueKey", "", time()-COOKIE_EXPIRE, COOKIE_PATH);
+      }
+
+      $this->_destroy();
     }
-    
+   
+   /**
+    * Forgot password
+    *
+    * Logs the user out by calling the {@link _destroy()} method.  Simple as that.
+    *
+    * @param    void
+    * @return   void
+    * @access   public
+    * @since    1.0
+    */
+    public function forgot_password ( $email )
+    {
+      return true;
+    }
+ 
    /**
     * Is User Logged In
     *
@@ -314,13 +335,20 @@ class userAuth extends PDO
     */
     public function is_logged_in()
     {
-        if(!isset($_SESSION['logged_in'], $_SESSION['_UniqueKey']) || $_SESSION['logged_in'] === false)
-            return false;
-        
-        if($this->validate_uniquekey())
-            return true;
-        else    
-            return false;
+      /* Check if user has been remembered */
+      if ( isset ( $_COOKIE['cookname']) && isset($_COOKIE['_UniqueKey']) )  {
+         $_SESSION['username']   = $_COOKIE['cookname'];
+         $_SESSION['_UniqueKey'] = $_COOKIE['_UniqueKey'];
+         $_SESSION['logged_in']  = true;
+      }
+
+      if ( ! isset ( $_SESSION['logged_in'], $_SESSION['_UniqueKey']) || $_SESSION['logged_in'] === false )
+        return false;
+
+      if ( $this->validate_uniquekey ( ) )
+        return true;
+      else    
+        return false;
     }
    
    /**
@@ -461,9 +489,9 @@ class userAuth extends PDO
     */
     protected function validate_uniquekey()
     {
-        $this->_regenerate_session_id();
+        $this->_regenerate_session_id ( );
         
-        if(isset($_SESSION['_UniqueKey']))
+        if ( isset($_SESSION['_UniqueKey'] ) )
             return $_SESSION['_UniqueKey'] === $this->_make_uniquekey();
         
         if(DEBUG) echo '_UniqueKey is not set!';
@@ -503,7 +531,7 @@ class userAuth extends PDO
     * @access   public
     * @since    1.0
     */
-    public function create_user( $username, $password )
+    public function create_user( $username, $password, $email, $remember )
     {
         $username = trim($username); // Remove any extra whitespace
         $password = trim($password);
@@ -596,8 +624,14 @@ class userAuth extends PDO
         
         if(!$this->check_table_exists('users'))
         {
-            require_once 'users.sql.php'; // Require SQL file
-           
+          // Users Table Structure
+          $sql1 = "CREATE TABLE users (" .
+            "id INTEGER PRIMARY KEY NOT NULL, ".
+            "username VARCHAR(75) UNIQUE NOT NULL, ". // 75 chars to accomodate email if using email for login
+            "password VARCHAR(40) NOT NULL, ".        // SHA1 Hash is always 40
+            "pattern VARCHAR(22) NOT NULL, ".
+            "salt1 VARCHAR(12) NOT NULL, ".
+            "salt2 VARCHAR(10) NOT NULL )";
             try {
                 $this->exec($sql1);
             }
@@ -624,10 +658,27 @@ class userAuth extends PDO
     }
 }
 
-$user = new userAuth;
+// Simple input handling.
+// Please note that no user input validation is done
+$auth = new userAuth;
+$type = $_GET['type'];
+$name = $_GET['username'];
+$pass = $_GET['password'];
+$email= $_GET['email'];
+$remember = $GET['remember'];
+
+switch ( $type )  {
+  case "login":  $auth->user_login  ( $name, $pass, $remember ); break;
+  case "logout": $auth->user_logout ( ); break;
+  case "forgot": $auth->forgot_password ( $email ); break;
+  case "signup": $auth->create_user ( $name, $pass, $email, $remember ); break;
+  case "check":  $auth->is_logged_in ( ); break;
+  case "newDB":  $auth->create_user_table ( ); break;
+  default: echo "Bad type"; break;
+}
+
 //$user->create_user_table();
 //$user->create_user('foo', 'bar');
-var_dump($user->is_logged_in());
+//var_dump ( $auth->is_logged_in ( ) );
 //$user->user_logout();
 //var_dump($user->user_login('foo', 'bar'));
-
