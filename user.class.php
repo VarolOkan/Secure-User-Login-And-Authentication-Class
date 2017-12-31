@@ -305,6 +305,7 @@ class userAuth extends PDO
       }
 
       $this->_destroy();
+      return true;
     }
    
    /**
@@ -668,12 +669,12 @@ $email= $_GET['email'];
 $remember = $GET['remember'];
 
 switch ( $type )  {
-  case "login":  $auth->user_login  ( $name, $pass, $remember ); break;
-  case "logout": $auth->user_logout ( ); break;
-  case "forgot": $auth->forgot_password ( $email ); break;
-  case "signup": $auth->create_user ( $name, $pass, $email, $remember ); break;
-  case "check":  $auth->is_logged_in ( ); break;
-  case "newDB":  $auth->create_user_table ( ); break;
+  case "login":  echo $auth->user_login  ( $name, $pass, $remember ) ? "true" : "false"; break;
+  case "logout": echo $auth->user_logout ( ) ? "true" : "false"; break;
+  case "forgot": echo $auth->forgot_password ( $email ) ? "true" : "false"; break;
+  case "signup": echo $auth->create_user ( $name, $pass, $email, $remember ) ? "true" : "false"; break;
+  case "check":  echo $auth->is_logged_in ( ) ? "true" : "false"; break;
+  case "newDB":  echo $auth->create_user_table ( ) ? "true" : "false"; break;
   default: echo "Bad type"; break;
 }
 
